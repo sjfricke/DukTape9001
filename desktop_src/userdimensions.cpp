@@ -119,11 +119,29 @@ UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
     ConfidencePoint3f* threedeeparts[numParts] = {&nose, &chest, &rshoulder, &relbow, &rwrist,
                                  &lshoulder, &lelbow, &lwrist, &lhip, &rknee, &lankle,
                                  &lhip, &lknee, &lankle, &reye, &leye, &rear, &lear};
-    for (int i = 0; i < this->numParts; i++) {
-        ConfidencePoint3f* dest_part = threedeeparts[i];
-        ConfidencePoint2f src_part = twodeeparts[i];
-        *dest_part = giveDepth(src_part, 0, 0, this->defaultDistance);
-    }
+    
+    // for (int i = 0; i < this->numParts; i++) {
+    //     ConfidencePoint3f* dest_part = threedeeparts[i];
+    //     ConfidencePoint2f src_part = twodeeparts[i];
+    //     *dest_part = giveDepth(src_part, 0, 0, this->defaultDistance);
+    // }
+
+    this->chest3d = giveDepth(chest, 0, 0, defaultDistance);
+    this->nose3d = giveDepth(nose, metric::chest_to_nose, nose::dist(chest), chest3d::z);
+    this->rear3d = addZ(rear, nose::z);
+    this->lear3d = addZ(rear, nose::z);
+    this->rshoulder3d giveDepth(rshoulder, metric::chest_to_shoulder, chest::dist(rshoulder), chest3d::z);
+    this->lshoulder3d giveDepth(lshoulder, metric::chest_to_shoulder, chest::dist(lshoulder), chest3d::z);
+    this->relbow3d giveDepth(relbow, metric::shoulder_to_elbow, rshoulder::dist(relbow), rshoulder::z);
+    this->lelbow3d giveDepth(lelbow, metric::shoulder_to_elbow, lshoulder::dist(lelbow), lshoulder::z);
+    this->rwrist3d giveDepth(rwrist, metric::elbow_to_wrist, relbow::dist(rwrist), relbow::z);
+    this->lwrist3d giveDepth(lwrist, metric::elbow_to_wrist, lelbow::dist(rwrist), lelbow::z);
+    this->rhip3d giveDepth(rhip, 0, 0, defaultDistance);
+    this->lhip3d giveDepth(rhip, 0, 0, defaultDistance);
+    this->rknee3d giveDepth(rknee, metric::hip_to_knee, rhip::dist(rknee), rhip3d::z);
+    this->lknee3d giveDepth(lknee, metric::hip_to_knee, rhip::dist(lknee), lhip3d::z);
+    this->rankle3d giveDepth(rankle, metric::knee_to_ankle, rankle::dist(rankle), rknee::z);
+    this->lankle3d giveDepth(lankle, metric::knee_to_ankle, lankle::dist(lankle), lknee::z);
 }
 
 UserTracked2d::UserTracked2d(std::vector<float> keypoints) {
