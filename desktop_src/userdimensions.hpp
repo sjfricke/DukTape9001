@@ -12,7 +12,6 @@ class ConfidencePoint3f {
     cv::Point3f pos;
     float conf;
     ConfidencePoint3f(float x, float y, float z, float conf);
-    
 };
 
 class ConfidencePoint2f {
@@ -27,15 +26,18 @@ class ConfidencePoint2f {
     float confDist(ConfidencePoint2f other);
 };
 
-class UserTracked {
+
+
+class UserTracked2d {
     public:
-    UserTracked() { }
+    UserTracked2d() { }
     ConfidencePoint2f nose, chest, rshoulder, relbow, rwrist, 
                     lshoulder, lelbow, lwrist, rhip, rknee,
                     rankle, lhip, lknee, lankle, reye, leye,
-                    rear, lear, background;
-    UserTracked(std::vector<float> keypoints);
+                    rear, lear;
+    UserTracked2d(std::vector<float> keypoints);
 };
+
 
 //Metrics about the user, where all dimensions are in pixels on the calibration
 //frame, where the user is placed at 6ft from the camera in T-position
@@ -51,6 +53,24 @@ public:
     float knee_to_ankle = 0.0f;
     //From the structured representation of the tracked user over a collection of sample
     //frames in the T pose, deduce the measurements above
-    UserMetrics(std::vector<UserTracked> trackedFrames);
+    UserMetrics(std::vector<UserTracked2d> trackedFrames);
     std::string to_string();
+};
+
+
+ConfidencePoint3f addZ(ConfidencePoint2f point, float z);
+
+ConfidencePoint3f giveDepth(ConfidencePoint2f flatpoint, float metric, float metricNew, float offset);
+
+class UserTracked3d {
+
+    public:
+    int numParts = 18;
+    int defaultDistance = 10.0;
+    UserTracked3d() { }
+    ConfidencePoint3f nose, chest, rshoulder, relbow, rwrist, 
+                    lshoulder, lelbow, lwrist, rhip, rknee,
+                    rankle, lhip, lknee, lankle, reye, leye,
+                    rear, lear;
+    UserTracked3d(UserMetrics metrics, UserTracked2d user);
 };

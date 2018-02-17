@@ -136,9 +136,9 @@ int waifYou(std::string videoSource)
         std::vector<float> keypoints = to_nice_float_array(poseKeypoints);
 
         //Okay, great, now we have the pose keypoints. Time to do our magic!
-        UserTracked trackedUser(keypoints);
+        UserTracked2d trackedUser(keypoints);
 
-        std::vector<UserTracked> sgFrame = std::vector<UserTracked>();
+        std::vector<UserTracked2d> sgFrame = std::vector<UserTracked2d>();
         sgFrame.push_back(trackedUser);
 
         UserMetrics userMetrics = UserMetrics(sgFrame);

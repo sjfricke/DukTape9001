@@ -12,7 +12,7 @@ std::string UserMetrics::to_string() {
     + ", Knee to Ankle " + std::to_string(knee_to_ankle);
 }
     
-UserMetrics::UserMetrics(std::vector<UserTracked> trackedFrames) {
+UserMetrics::UserMetrics(std::vector<UserTracked2d> trackedFrames) {
     float nose_to_ear_weight = 0.0f;
     float chest_to_nose_weight = 0.0f;
     float chest_to_shoulder_weight = 0.0f;
@@ -21,7 +21,7 @@ UserMetrics::UserMetrics(std::vector<UserTracked> trackedFrames) {
     float hip_to_knee_weight = 0.0f;
     float knee_to_ankle_weight = 0.0f;
     for (int i = 0; i < trackedFrames.size(); i++) {
-        UserTracked frame = trackedFrames[i];
+        UserTracked2d frame = trackedFrames[i];
 
         nose_to_ear_weight += frame.nose.pairConf(frame.lear) + frame.nose.pairConf(frame.rear);
         this->nose_to_ear += frame.nose.confDist(frame.lear) + frame.nose.confDist(frame.rear);
@@ -100,7 +100,33 @@ std::vector<float> to_nice_float_array(op::Array<float> input) {
     return result;
 }
 
-UserTracked::UserTracked(std::vector<float> keypoints) {
+// a quick abstraction to add a dimention to a 2d point
+ConfidencePoint3f addZ(ConfidencePoint2f point, float z) {
+    return ConfidencePoint3f(point.pos.x, point.pos.y, z, point.conf);
+}
+
+
+ConfidencePoint3f giveDepth(ConfidencePoint2f flatpoint, float metric, float metricNew, float offset) {
+    float z = sqrt(pow(metric, 2.0) + pow(metricNew, 2.0));
+    addZ(flatpoint, z + offset);
+}
+
+UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
+    ConfidencePoint2f twodeeparts[numParts] = {user.nose, user.chest, user.rshoulder, user.relbow, user.rwrist,
+                                 user.lshoulder, user.lelbow, user.lwrist, user.lhip, user.rknee, user.lankle,
+                                 user.lhip, user.lknee, user.lankle, user.reye, user.leye, user.rear, user.lear};
+
+    ConfidencePoint3f* threedeeparts[numParts] = {&nose, &chest, &rshoulder, &relbow, &rwrist,
+                                 &lshoulder, &lelbow, &lwrist, &lhip, &rknee, &lankle,
+                                 &lhip, &lknee, &lankle, &reye, &leye, &rear, &lear};
+    for (int i = 0; i < this->numParts; i++) {
+        ConfidencePoint3f* dest_part = threedeeparts[i];
+        ConfidencePoint2f src_part = twodeeparts[i];
+        *dest_part = giveDepth(src_part, 0, 0, this->defaultDistance);
+    }
+}
+
+UserTracked2d::UserTracked2d(std::vector<float> keypoints) {
 
     int numParts = 18;
     ConfidencePoint2f* parts[numParts] = {&nose, &chest, &rshoulder, &relbow, &rwrist,
@@ -115,6 +141,3 @@ UserTracked::UserTracked(std::vector<float> keypoints) {
         offset += 3;
     }
 }
-
-
-
