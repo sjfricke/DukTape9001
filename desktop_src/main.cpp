@@ -26,6 +26,7 @@
 #include <openpose/pose/headers.hpp>
 #include <openpose/utilities/headers.hpp>
 #include "userdimensions.hpp"
+#include "unistd.h"
 
 // See all the available parameter options withe the `--help` flag. E.g. `build/examples/openpose/openpose.bin --help`
 // Note: This command will show you flags for other unnecessary 3rdparty files. Check only the flags for the OpenPose
@@ -40,7 +41,7 @@ DEFINE_string(image_path,               "examples/media/COCO_val2014_00000000019
 DEFINE_string(model_pose,               "COCO",         "Model to be used. E.g. `COCO` (18 keypoints), `MPI` (15 keypoints, ~10% faster), "
                                                         "`MPI_4_layers` (15 keypoints, even faster but less accurate).");
 DEFINE_string(model_folder,             "models/",      "Folder path (absolute or relative) where the models (pose, face, ...) are located.");
-DEFINE_string(net_resolution,           "-1x256",       "Multiples of 16. If it is increased, the accuracy potentially increases. If it is"
+DEFINE_string(net_resolution,           "-1x128",       "Multiples of 16. If it is increased, the accuracy potentially increases. If it is"
                                                         " decreased, the speed increases. For maximum speed-accuracy balance, it should keep the"
                                                         " closest aspect ratio possible to the images or videos to be processed. Using `-1` in"
                                                         " any of the dimensions, OP will choose the optimal aspect ratio depending on the user's"
@@ -80,7 +81,7 @@ int waifYou(std::string videoSource)
     // outputSize
     const auto outputSize = op::flagsToPoint(FLAGS_output_resolution, "-1x-1");
     // netInputSize
-    const auto netInputSize = op::flagsToPoint(FLAGS_net_resolution, "-1x256");
+    const auto netInputSize = op::flagsToPoint(FLAGS_net_resolution, "-1x128");
     // poseModel
     const auto poseModel = op::flagsToPoseModel(FLAGS_model_pose);
     // Check no contradictory flags enabled
@@ -107,9 +108,26 @@ int waifYou(std::string videoSource)
         op::error("Could not load the video file " + videoSource, __LINE__, __FUNCTION__, __FILE__);
     }
 
+    int num_calibration_frames = 30;
+
+    op::log("----------------------------------", op::Priority::High);
+    op::log("------CALIBRATION START-----------", op::Priority::High);
+    op::log("----------------------------------", op::Priority::High);
+    op::log("------HIT ENTER TO CONTINUE-------", op::Priority::High);
+    op::log("------YOU WILL HAVE 5 SECONDS-----", op::Priority::High);
+    op::log("------TO GET INTO T POSITION------", op::Priority::High);
+    op::log("----------------------------------", op::Priority::High);
+    getchar();
+    sleep(5);
+
+    
+    std::vector<UserTracked2d> calibrationData = std::vector<UserTracked2d>();
+
+    UserMetrics userMetrics;
+
     //MAIN LOOP
     //TODO: Termination condition
-    for (int i = 0; i < 10; i++) {
+    for (;;) {
 
         cv::Mat frame;
         video >> frame;
@@ -138,14 +156,23 @@ int waifYou(std::string videoSource)
         //Okay, great, now we have the pose keypoints. Time to do our magic!
         UserTracked2d trackedUser(keypoints);
 
-        std::vector<UserTracked2d> sgFrame = std::vector<UserTracked2d>();
-        sgFrame.push_back(trackedUser);
-
-        UserMetrics userMetrics = UserMetrics(sgFrame);
-        
-        op::log(userMetrics.to_string(), op::Priority::High);
-
-        //For now, just print this information to the console
+        if (calibrationData.size() < num_calibration_frames) {
+            //Still calibrating
+            calibrationData.push_back(trackedUser);
+            if (calibrationData.size() == num_calibration_frames) {
+                //Generate the metric data
+                userMetrics = UserMetrics(calibrationData);
+                op::log("----------------------------------", op::Priority::High);
+                op::log("--------CALIBRATION COMPLETE------", op::Priority::High);
+                op::log("----------------------------------", op::Priority::High);
+                op::log("------------USER METRICS----------", op::Priority::High);
+                op::log(userMetrics.to_string(), op::Priority::High);
+                op::log("----------------------------------", op::Priority::High);
+            }
+        }
+        else {
+            //Done calibrating, do stuff
+        }
 
     }
     // Return successful message
