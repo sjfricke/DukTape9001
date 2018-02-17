@@ -2,6 +2,7 @@ set(EXAMPLE_FILES
   main.cpp
   )
 
+
 foreach(EXAMPLE_FILE ${EXAMPLE_FILES})
 
   get_filename_component(SOURCE_NAME ${EXAMPLE_FILE} NAME_WE)
@@ -13,7 +14,7 @@ foreach(EXAMPLE_FILE ${EXAMPLE_FILES})
   endif ()
 
   message(STATUS "Adding Example ${EXE_NAME}")
-  add_executable(${EXE_NAME} ${EXAMPLE_FILE})
+  add_executable(${EXE_NAME} ${EXAMPLE_FILE} userdimensions.cpp)
   target_link_libraries(${EXE_NAME} openpose ${GLOG_LIBRARY} ${GFLAGS_LIBRARY} ${Caffe_LIBS} ${MKL_LIBS} ${GLUT_LIBRARY} ${SPINNAKER_LIB})
   
   if (WIN32)

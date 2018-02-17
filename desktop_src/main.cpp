@@ -1,3 +1,7 @@
+//Waifyou -- make anime real
+//Here, for now, we're just going to read a video file and attempt to back
+//out the 3d pose data from that
+
 // ------------------------- OpenPose Library Tutorial - Pose - Example 1 - Extract from Image -------------------------
 // This first example shows the user how to:
     // 1. Load an image (`filestream` module)
@@ -21,6 +25,7 @@
 #include <openpose/gui/headers.hpp>
 #include <openpose/pose/headers.hpp>
 #include <openpose/utilities/headers.hpp>
+#include "userdimensions.hpp"
 
 // See all the available parameter options withe the `--help` flag. E.g. `build/examples/openpose/openpose.bin --help`
 // Note: This command will show you flags for other unnecessary 3rdparty files. Check only the flags for the OpenPose
@@ -35,7 +40,7 @@ DEFINE_string(image_path,               "examples/media/COCO_val2014_00000000019
 DEFINE_string(model_pose,               "COCO",         "Model to be used. E.g. `COCO` (18 keypoints), `MPI` (15 keypoints, ~10% faster), "
                                                         "`MPI_4_layers` (15 keypoints, even faster but less accurate).");
 DEFINE_string(model_folder,             "models/",      "Folder path (absolute or relative) where the models (pose, face, ...) are located.");
-DEFINE_string(net_resolution,           "-1x368",       "Multiples of 16. If it is increased, the accuracy potentially increases. If it is"
+DEFINE_string(net_resolution,           "-1x256",       "Multiples of 16. If it is increased, the accuracy potentially increases. If it is"
                                                         " decreased, the speed increases. For maximum speed-accuracy balance, it should keep the"
                                                         " closest aspect ratio possible to the images or videos to be processed. Using `-1` in"
                                                         " any of the dimensions, OP will choose the optimal aspect ratio depending on the user's"
@@ -59,9 +64,10 @@ DEFINE_double(render_threshold,         0.05,           "Only estimated keypoint
 DEFINE_double(alpha_pose,               0.6,            "Blending factor (range 0-1) for the body part rendering. 1 will show it completely, 0 will"
                                                         " hide it. Only valid for GPU rendering.");
 
-int openPoseTutorialPose1()
+//TODO: Change from video source to webcam source (though this is easy with OpenCV!)
+int waifYou(std::string videoSource)
 {
-    op::log("OpenPose Library Tutorial - Example 1.", op::Priority::High);
+    op::log("WaifYou v0.1", op::Priority::High);
     // ------------------------- INITIALIZATION -------------------------
     // Step 1 - Set logging level
         // - 0 will output all the logging messages
@@ -74,7 +80,7 @@ int openPoseTutorialPose1()
     // outputSize
     const auto outputSize = op::flagsToPoint(FLAGS_output_resolution, "-1x-1");
     // netInputSize
-    const auto netInputSize = op::flagsToPoint(FLAGS_net_resolution, "-1x368");
+    const auto netInputSize = op::flagsToPoint(FLAGS_net_resolution, "-1x256");
     // poseModel
     const auto poseModel = op::flagsToPoseModel(FLAGS_model_pose);
     // Check no contradictory flags enabled
@@ -85,49 +91,63 @@ int openPoseTutorialPose1()
                   __LINE__, __FUNCTION__, __FILE__);
     // Logging
     op::log("", op::Priority::Low, __LINE__, __FUNCTION__, __FILE__);
+
     // Step 3 - Initialize all required classes
     op::ScaleAndSizeExtractor scaleAndSizeExtractor(netInputSize, outputSize, FLAGS_scale_number, FLAGS_scale_gap);
     op::CvMatToOpInput cvMatToOpInput;
-    op::CvMatToOpOutput cvMatToOpOutput;
     op::PoseExtractorCaffe poseExtractorCaffe{poseModel, FLAGS_model_folder, FLAGS_num_gpu_start};
-    op::PoseCpuRenderer poseRenderer{poseModel, (float)FLAGS_render_threshold, !FLAGS_disable_blending,
-                                     (float)FLAGS_alpha_pose};
-    op::OpOutputToCvMat opOutputToCvMat;
-    op::FrameDisplayer frameDisplayer{"OpenPose Tutorial - Example 1", outputSize};
+
     // Step 4 - Initialize resources on desired thread (in this case single thread, i.e. we init resources here)
     poseExtractorCaffe.initializationOnThread();
-    poseRenderer.initializationOnThread();
+    
+    //INIT COMPLETE
+    //Now, read in the video file
+    cv::VideoCapture video(videoSource);
+    if (!video.isOpened()) {
+        op::error("Could not load the video file " + videoSource, __LINE__, __FUNCTION__, __FILE__);
+    }
 
-    // ------------------------- POSE ESTIMATION AND RENDERING -------------------------
-    // Step 1 - Read and load image, error if empty (possibly wrong path)
-    // Alternative: cv::imread(FLAGS_image_path, CV_LOAD_IMAGE_COLOR);
-    cv::Mat inputImage = op::loadImage(FLAGS_image_path, CV_LOAD_IMAGE_COLOR);
-    if(inputImage.empty())
-        op::error("Could not open or find the image: " + FLAGS_image_path, __LINE__, __FUNCTION__, __FILE__);
-    const op::Point<int> imageSize{inputImage.cols, inputImage.rows};
-    // Step 2 - Get desired scale sizes
-    std::vector<double> scaleInputToNetInputs;
-    std::vector<op::Point<int>> netInputSizes;
-    double scaleInputToOutput;
-    op::Point<int> outputResolution;
-    std::tie(scaleInputToNetInputs, netInputSizes, scaleInputToOutput, outputResolution)
-        = scaleAndSizeExtractor.extract(imageSize);
-    // Step 3 - Format input image to OpenPose input and output formats
-    const auto netInputArray = cvMatToOpInput.createArray(inputImage, scaleInputToNetInputs, netInputSizes);
-    auto outputArray = cvMatToOpOutput.createArray(inputImage, scaleInputToOutput, outputResolution);
-    // Step 4 - Estimate poseKeypoints
-    poseExtractorCaffe.forwardPass(netInputArray, imageSize, scaleInputToNetInputs);
-    const auto poseKeypoints = poseExtractorCaffe.getPoseKeypoints();
-    // Step 5 - Render poseKeypoints
-    poseRenderer.renderPose(outputArray, poseKeypoints, scaleInputToOutput);
-    // Step 6 - OpenPose output format to cv::Mat
-    auto outputImage = opOutputToCvMat.formatToCvMat(outputArray);
+    //MAIN LOOP
+    //TODO: Termination condition
+    for (int i = 0; i < 10; i++) {
 
-    // ------------------------- SHOWING RESULT AND CLOSING -------------------------
-    // Step 1 - Show results
-    frameDisplayer.displayFrame(outputImage, 0); // Alternative: cv::imshow(outputImage) + cv::waitKey(0)
-    // Step 2 - Logging information message
-    op::log("Example 1 successfully finished.", op::Priority::High);
+        cv::Mat frame;
+        video >> frame;
+        if (frame.empty()) {
+            op::error("Could not load some video frame from " + videoSource, __LINE__, __FUNCTION__, __FILE__);
+        }
+        const op::Point<int> imageSize{frame.cols, frame.rows};
+
+        //Get image scales
+        std::vector<double> scaleInputToNetInputs;
+        std::vector<op::Point<int>> netInputSizes;
+        double scaleInputToOutput;
+        op::Point<int> outputResolution;
+        std::tie(scaleInputToNetInputs, netInputSizes, scaleInputToOutput, outputResolution)
+            = scaleAndSizeExtractor.extract(imageSize);
+
+        // Step 3 - Format input image to OpenPose input and output formats
+        const auto netInputArray = cvMatToOpInput.createArray(frame, scaleInputToNetInputs, netInputSizes);
+
+        // Step 4 - Estimate poseKeypoints
+        poseExtractorCaffe.forwardPass(netInputArray, imageSize, scaleInputToNetInputs);
+        const auto poseKeypoints = poseExtractorCaffe.getPoseKeypoints();
+
+        std::vector<float> keypoints = to_nice_float_array(poseKeypoints);
+
+        //Okay, great, now we have the pose keypoints. Time to do our magic!
+        UserTracked trackedUser(keypoints);
+
+        std::vector<UserTracked> sgFrame = std::vector<UserTracked>();
+        sgFrame.push_back(trackedUser);
+
+        UserMetrics userMetrics = UserMetrics(sgFrame);
+        
+        op::log(userMetrics.to_string(), op::Priority::High);
+
+        //For now, just print this information to the console
+
+    }
     // Return successful message
     return 0;
 }
@@ -137,6 +157,8 @@ int main(int argc, char *argv[])
     // Parsing command line flags
     gflags::ParseCommandLineFlags(&argc, &argv, true);
 
+    //TODO: read in from argv the video file name
+
     // Running openPoseTutorialPose1
-    return openPoseTutorialPose1();
+    return waifYou("../repo/DukTape9001/test_data/testmovie.avi");
 }
