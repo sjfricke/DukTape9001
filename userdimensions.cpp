@@ -78,8 +78,8 @@ public:
         this->x = x;
         this->y = y;
     }
-    float dist(Point2d other) {
-        return sqrtf(this->x * other.x + this-> y * other.y)
+    float dist(Pont2d other) {
+      return sqrt(pow((this->x - other.x), 2.0) + pow((this-> y - other.y), 2.0))
     }
 };
 
@@ -118,24 +118,76 @@ class ConfidencePoint3d {
 class UserTracked {
     public:
     ConfidencePoint2d nose, chest, rshoulder, relbow, rwrist, 
-                    lshoulder, lelbow, lwrist, rhip, rknee,
-                    lankle, lhip, lknee, lankle, reye, leye,
-                    rear, lear, background;
-    UserTracked(Array<float> keypoints) {
-        numParts = 18;
+                      lshoulder, lelbow, lwrist, rhip, rknee,
+                      lankle, lhip, lknee, lankle, reye, leye,
+                      rear, lear, background;
+    ConfidencePoint3d nose3d, chest3d, rshoulder3d, relbow3d, rwrist3d, 
+                      lshoulder3d, lelbow3d, lwrist3d, rhip3d, rknee3d,
+                      lankle3d, lhip3d, lknee3d, lankle3d, reye3d, leye3d,
+                      rear3d, lear3d, background3d;
+    int numParts = 18;
+    int defaultDistance = 10.0;
+    UserMetrics metrics;
+    UserTracked(Array<float> keypoints, Array<UserTracked> trackedFrames) {
+        calibrate(trackedFrames);
+        update(keypoints);
+    }
+    
+    void update(Array<float> keypoints) {
         ConfidencePoint2d** parts = {&nose, &chest, &rshoulder, &relbow, &rwrist,
                                      &lshoulder, &lelbow, &lwrist, &lhip, &rknee, &lankle,
                                      &lhip, &lknee, &lankle, &reye, &leye, &rear, &lear, &background};
-        offset = 0;
+
+        ConfidencePoint3d** parts3d = {&nose3d, &chest3d, &rshoulder3d, &relbow3d, &rwrist3d,
+                                     &lshoulder3d, &lelbow3d, &lwrist3d, &lhip3d, &rknee3d, &lankle3d,
+                                     &lhip3d, &lknee3d, &lankle3d, &reye3d, &leye3d, &rear3d, &lear3d, &background3d};
+        int offset = 0;
         for (int i = 0; i < numParts; i++) {
-            part = parts[i];
+            Confidence2d* part = parts[i];
             &part = ConfidencePoint2d(keypoints[offset], keypoints[offset + 1],
                                       keypoints[offset + 2]);
+            part3d = parts3d[i];
+            &part3d = giveDepth(part, 0, 0, defaultDistance);
             offset += 3;
         }
+            // float chest_to_nose = 0.0f; //"Chest" here actually means something more like "bottom of neck"
+            // float nose_to_ear = 0.0f;
+            // float chest_to_shoulder = 0.0f;
+            // float elbow_to_wrist = 0.0f;
+            // float shoulder_to_elbow = 0.0f;
+            // float hip_to_knee = 0.0f; //This measurement is based on the distance from one of left/right hip to the knee (averaged)
+            // float knee_to_ankle = 0.0f;
+        // this->chest3d = giveDepth(chest, 0, 0, defaultDistance);
+        // this->nose3d = giveDepth(nose, metric::chest_to_nose, nose::dist(chest), chest3d::z);
+        // this->rear3d = addZ(rear, nose::z);
+        // this->lear3d = addZ(rear, nose::z);
+        // this->rshoulder3d giveDepth(rshoulder, metric::chest_to_shoulder, chest::dist(rshoulder), chest3d::z);
+        // this->lshoulder3d giveDepth(lshoulder, metric::chest_to_shoulder, chest::dist(lshoulder), chest3d::z);
+        // this->relbow3d giveDepth(relbow, metric::shoulder_to_elbow, rshoulder::dist(relbow), rshoulder::z);
+        // this->lelbow3d giveDepth(lelbow, metric::shoulder_to_elbow, lshoulder::dist(lelbow), lshoulder::z);
+        // this->rwrist3d giveDepth(rwrist, metric::elbow_to_wrist, relbow::dist(rwrist), relbow::z);
+        // this->lwrist3d giveDepth(lwrist, metric::elbow_to_wrist, lelbow::dist(rwrist), lelbow::z);
+        // this->rhip3d giveDepth(rhip, 0, 0, defaultDistance);
+        // this->lhip3d giveDepth(rhip, 0, 0, defaultDistance);
+        // this->rknee3d giveDepth(rknee, metric::hip_to_knee, rhip::dist(rknee), rhip3d::z);
+        // this->lknee3d giveDepth(lknee, metric::hip_to_knee, rhip::dist(lknee), lhip3d::z);
+        // this->rankle3d giveDepth(rankle, metric::knee_to_ankle, rankle::dist(rankle), rknee::z);
+        // this->lankle3d giveDepth(lankle, metric::knee_to_ankle, lankle::dist(lankle), lknee::z);
+    }
+      
+    UserMetrics calibrate(Array<UserTracked> trackedFrames) {
+        this->metrics = new UserMetric(trackedFrames);
     }
 };
 
+// a quick abstraction to add a dimention to a 2d point
+ConfidencePoint3d addZ(ConfidencePoint2d point, float z) {
+    return new ConfidencePoint3d(point->x, point->y, z);
+}
 
 
+ConfidencePoint3d giveDepth(ConfidencePoint2d flatpoint, float metric, float metricNew, float offset) {
+    float z = sqrt(pow(metric, 2.0), pow(metricNew, 2.0));
+    addZ(point, z + offset);
+}
 
