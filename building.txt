@@ -1,0 +1,17 @@
+To build this project, 
+you must have the repository's directory (DukTape9001) inside of a 
+"repo" folder, which is inside of some other directory (say, "AnimeReal")
+which contains a copy of the "openpose" directory for the OpenPose repository
+
+So the directory structure should be
+
+AnimeReal
+    repo
+        DukTape9001
+    openpose
+
+Yes, this is hacky, but it's a quick way to ensure we don't need to fiddle
+around with makefiles and stuff
+
+run desktop_build.sh to build the desktop program, 
+and desktop_run.sh to run it
