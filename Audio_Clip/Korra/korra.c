@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-
+#include <ctype.h>
 #include <sphinxbase/err.h>
 #include <sphinxbase/ad.h>
 #include <pocketsphinx.h>
@@ -113,7 +113,7 @@ void CleanUp() {
 int main(int argc, char* argv[]) {
 
   DictionarySetup();
-
+  while(1){
   GetPhrase();
   	//This is the string that is getting split
     char sentence[1024];
@@ -121,12 +121,16 @@ int main(int argc, char* argv[]) {
 	const char wav[9] = ".wav -i";
 	char commandString[1024];
 	strcpy(commandString, "ffmpeg -i ");
+	printf("\n\n");
+	printf(phrase);
+	printf("\n\n");
 	//This is the new array of strings which is used to hold the words.
     int i,j,k,cctr,sInt,wctr;
        printf("\n\n Split string by space into words :\n");
        printf("---------------------------------------\n");    
-	strcpy(sentence,phrase);
-	strupr(sentence);
+	for(k=0; phrase[k]!='\0';k++){
+		sentence[k]=toupper(phrase[k]);
+	}
     j=0; cctr=0; sInt = 0; wctr = 0;
     for(i=0;i<=(strlen(sentence));i++)
     {
@@ -135,8 +139,8 @@ int main(int argc, char* argv[]) {
         {
 			//This copies from the base string 
 			if(i == strlen(sentence)){
-				memcpy(cstring+cctr,sentence+sInt,j-1);
-				cctr = cctr +j -1;//Changes the index for the insertion
+				memcpy(cstring+cctr,sentence+sInt,j);
+				cctr = cctr +j;//Changes the index for the insertion
 				memcpy(cstring+cctr,wav,5);
 				cctr = cctr + 5;
 			}
@@ -180,7 +184,7 @@ int main(int argc, char* argv[]) {
 	strcat(commandString,anotherMini);
 	strcat(commandString,":v=0:a=1[outa]\" -map \"[outa]\" output.wav");
 	system(commandString);
-	system("ffplay -autoexit output.wav");
+	system("aplay -D plughw:0,1 output.wav");
 	system("rm output.wav");
 	printf("\n\n");
 	printf(commandString);
@@ -191,6 +195,7 @@ int main(int argc, char* argv[]) {
 	printf("\n\n");
 
 	CleanUp();
+	}
 	return 0;
 
 	  
