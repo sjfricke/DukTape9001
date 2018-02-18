@@ -12,6 +12,9 @@ class ConfidencePoint3f {
     cv::Point3f pos;
     float conf;
     ConfidencePoint3f(float x, float y, float z, float conf);
+    float getZ() {
+        return this->pos.z;
+    }
 };
 
 class ConfidencePoint2f {
@@ -74,3 +77,4 @@ class UserTracked3d {
                     rear, lear;
     UserTracked3d(UserMetrics metrics, UserTracked2d user);
 };
+float distc(ConfidencePoint2f x, ConfidencePoint2f y);

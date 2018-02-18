@@ -73,6 +73,12 @@ float dist(cv::Point2f a, cv::Point2f b) {
     return sqrtf(xdist * xdist + ydist * ydist);
 }
 
+float distc(ConfidencePoint2f x, ConfidencePoint2f y) {
+    cv::Point2f a = x.pos;
+    cv::Point2f b = y.pos;
+    return dist(a, b);
+}
+
 
 ConfidencePoint2f::ConfidencePoint2f(float x, float y, float conf) {
     this->pos = cv::Point2f(x, y);
@@ -126,22 +132,22 @@ UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
     //     *dest_part = giveDepth(src_part, 0, 0, this->defaultDistance);
     // }
 
-    this->chest3d = giveDepth(chest, 0, 0, defaultDistance);
-    this->nose3d = giveDepth(nose, metric::chest_to_nose, nose::dist(chest), chest3d::z);
-    this->rear3d = addZ(rear, nose::z);
-    this->lear3d = addZ(rear, nose::z);
-    this->rshoulder3d giveDepth(rshoulder, metric::chest_to_shoulder, chest::dist(rshoulder), chest3d::z);
-    this->lshoulder3d giveDepth(lshoulder, metric::chest_to_shoulder, chest::dist(lshoulder), chest3d::z);
-    this->relbow3d giveDepth(relbow, metric::shoulder_to_elbow, rshoulder::dist(relbow), rshoulder::z);
-    this->lelbow3d giveDepth(lelbow, metric::shoulder_to_elbow, lshoulder::dist(lelbow), lshoulder::z);
-    this->rwrist3d giveDepth(rwrist, metric::elbow_to_wrist, relbow::dist(rwrist), relbow::z);
-    this->lwrist3d giveDepth(lwrist, metric::elbow_to_wrist, lelbow::dist(rwrist), lelbow::z);
-    this->rhip3d giveDepth(rhip, 0, 0, defaultDistance);
-    this->lhip3d giveDepth(rhip, 0, 0, defaultDistance);
-    this->rknee3d giveDepth(rknee, metric::hip_to_knee, rhip::dist(rknee), rhip3d::z);
-    this->lknee3d giveDepth(lknee, metric::hip_to_knee, rhip::dist(lknee), lhip3d::z);
-    this->rankle3d giveDepth(rankle, metric::knee_to_ankle, rankle::dist(rankle), rknee::z);
-    this->lankle3d giveDepth(lankle, metric::knee_to_ankle, lankle::dist(lankle), lknee::z);
+    this->chest = giveDepth(user.chest, 0, 0, defaultDistance);
+    this->nose = giveDepth(user.nose, metrics.chest_to_nose, distc(user.nose, user.chest), chest.getZ());
+    this->rear = addZ(user.rear, nose.getZ());
+    this->lear = addZ(user.rear, nose.getZ());
+    this->rshoulder = giveDepth(user.rshoulder, metrics.chest_to_shoulder, distc(user.chest, user.rshoulder), chest.getZ());
+    this->lshoulder = giveDepth(user.lshoulder, metrics.chest_to_shoulder, distc(user.chest, user.lshoulder), chest.getZ());
+    this->relbow = giveDepth(user.relbow, metrics.shoulder_to_elbow, distc(user.rshoulder, user.relbow), rshoulder.getZ());
+    this->lelbow = giveDepth(user.lelbow, metrics.shoulder_to_elbow, distc(user.lshoulder, user.lelbow), lshoulder.getZ());
+    this->rwrist = giveDepth(user.rwrist, metrics.elbow_to_wrist, distc(user.relbow, user.rwrist), relbow.getZ());
+    this->lwrist = giveDepth(user.lwrist, metrics.elbow_to_wrist, distc(user.lelbow, user.lwrist), lelbow.getZ());
+    this->rhip = giveDepth(user.rhip, 0, 0, defaultDistance);
+    this->lhip = giveDepth(user.lhip, 0, 0, defaultDistance);
+    this->rknee = giveDepth(user.rknee, metrics.hip_to_knee, distc(user.rhip, user.rknee), rhip.getZ());
+    this->lknee = giveDepth(user.lknee, metrics.hip_to_knee, distc(user.lhip, user.lknee), lhip.getZ());
+    this->rankle = giveDepth(user.rankle, metrics.knee_to_ankle, distc(user.rknee, user.rankle), rknee.getZ());
+    this->lankle = giveDepth(user.lankle, metrics.knee_to_ankle, distc(user.lknee, user.lankle), lknee.getZ());
 }
 
 UserTracked2d::UserTracked2d(std::vector<float> keypoints) {
