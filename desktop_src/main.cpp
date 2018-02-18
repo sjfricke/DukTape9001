@@ -27,6 +27,11 @@
 #include <openpose/utilities/headers.hpp>
 #include "userdimensions.hpp"
 #include "unistd.h"
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glut.h>
 
 // See all the available parameter options withe the `--help` flag. E.g. `build/examples/openpose/openpose.bin --help`
 // Note: This command will show you flags for other unnecessary 3rdparty files. Check only the flags for the OpenPose
@@ -65,10 +70,103 @@ DEFINE_double(render_threshold,         0.05,           "Only estimated keypoint
 DEFINE_double(alpha_pose,               0.6,            "Blending factor (range 0-1) for the body part rendering. 1 will show it completely, 0 will"
                                                         " hide it. Only valid for GPU rendering.");
 
+std::string model_directory = "../repo/DukTape9001/3dmodel/";
+std::string left_leg_file = model_directory + "pipimilegleft.obj";
+std::string right_leg_file = model_directory + "pipimilegright.obj";
+std::string right_arm_file = model_directory + "pipimiarmright.obj";
+std::string left_arm_file = model_directory + "pipimiarmleft.obj";
+std::string body_head_file = model_directory + "pipimibodyhead.obj";
+
+//Converts the silly index form of a mesh to a sequential form
+tinyobj::mesh_t& standardize_mesh(tinyobj::mesh_t& in) {
+    std::vector<float> positions;
+    std::vector<float> normals;
+    std::vector<unsigned int> indices;
+    for (int i = 0; i < in.indices.size(); i++) {
+        positions.push_back(in.positions[3 * in.indices[i]]);
+        positions.push_back(in.positions[3 * in.indices[i] + 1]);
+        positions.push_back(in.positions[3 * in.indices[i] + 2]);
+        
+        normals.push_back(in.normals[3 * in.indices[i]]);
+        normals.push_back(in.normals[3 * in.indices[i] + 1]);
+        normals.push_back(in.normals[3 * in.indices[i] + 2]);
+
+        indices.push_back(i);
+    }
+    in.positions.clear();
+    in.normals.clear();
+    in.indices.clear();
+
+    in.positions = positions;
+    in.normals = normals;
+    in.indices = indices;
+
+    return in;
+}
+
+int screen_width = 256;
+int screen_height = 256;
+std::vector<std::uint8_t> rendered_data(256*256*4);
+
+void renderMesh(tinyobj::mesh_t& mesh, float screen_plane_rot, float into_screen_rot, 
+                float x, float y, float z) {
+    //TODO: ROTATE
+    glPushMatrix();
+    
+
+
+    glTranslatef(x, y, z);
+
+    glBegin(GL_TRIANGLES);
+    for (int i = 0; i < mesh.positions.size(); i += 3) {
+        float x = mesh.positions[i];
+        float y = mesh.positions[i + 1];
+        float z = mesh.positions[i + 2];
+        float normx = mesh.normals[i];
+        float normy = mesh.normals[i + 1];
+        float normz = mesh.positions[i + 2];
+        glNormal3f(normx, normy, normz);
+        glTexCoord2f(0.0, 0.0);
+        glVertex3f(x, y, z);
+    }
+    glEnd();
+}
+
 //TODO: Change from video source to webcam source (though this is easy with OpenCV!)
 int waifYou(std::string videoSource)
 {
     op::log("WaifYou v0.1", op::Priority::High);
+
+    //Before we do __anything__, load the gosh darn anime models
+    std::vector<tinyobj::shape_t> left_leg_shapes, right_leg_shapes, left_arm_shapes, right_arm_shapes, body_head_shapes;
+    std::vector<tinyobj::material_t> left_leg_matls, right_leg_matls, left_arm_matls, right_arm_matls, body_head_matls;
+
+    std::string err;
+    bool ret = tinyobj::LoadObj(left_leg_shapes, left_leg_matls, err, left_leg_file.c_str());
+    ret = tinyobj::LoadObj(right_leg_shapes, right_leg_matls, err, right_leg_file.c_str());
+    ret = tinyobj::LoadObj(right_arm_shapes, right_arm_matls, err, right_arm_file.c_str());
+    ret = tinyobj::LoadObj(left_arm_shapes, left_arm_matls, err, left_arm_file.c_str());
+    ret = tinyobj::LoadObj(body_head_shapes, body_head_matls, err, body_head_file.c_str());
+
+    tinyobj::mesh_t left_leg_mesh = standardize_mesh(left_leg_shapes[0].mesh);
+    tinyobj::mesh_t right_leg_mesh = standardize_mesh(right_leg_shapes[0].mesh);
+    tinyobj::mesh_t left_arm_mesh = standardize_mesh(left_arm_shapes[0].mesh);
+    tinyobj::mesh_t right_arm_mesh = standardize_mesh(right_arm_shapes[0].mesh);
+    tinyobj::mesh_t body_head_mesh = standardize_mesh(body_head_shapes[0].mesh);
+   
+    //INITIALIZE GL
+    GLuint fbo, render_buf;
+    //glGenFramebuffers(1, &fbo);
+    //glGenRenderbuffers(1, &render_buf);
+    //glBindRenderbuffer(render_buf);
+    //glRenderbufferStorage(GL_RENDERBUFFER, GL_BGRA8, width, height);
+    //glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    //glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, render_buf);
+
+    //glReadBuffer(GL_BACK);
+    //glReadPixels(0, 0, screen_width, screen_height, GL_BGRA, GL_UNSIGNED_BYTE, &rendered_data[0]);
+
+
     // ------------------------- INITIALIZATION -------------------------
     // Step 1 - Set logging level
         // - 0 will output all the logging messages
@@ -118,7 +216,7 @@ int waifYou(std::string videoSource)
     op::log("------TO GET INTO T POSITION------", op::Priority::High);
     op::log("----------------------------------", op::Priority::High);
     getchar();
-    sleep(5);
+    //sleep(5);
 
     
     std::vector<UserTracked2d> calibrationData = std::vector<UserTracked2d>();
@@ -171,18 +269,49 @@ int waifYou(std::string videoSource)
             }
         }
         else {
-            //Done calibrating, do stuff
+
+            //Get the 3d tracked user
+            UserTracked3d tracked = UserTracked3d(userMetrics, trackedUser);
+            cv::Point3f head_body_average = 0.1 * (tracked.nose.pos + tracked.lshoulder.pos + tracked.rshoulder.pos
+                                + tracked.rear.pos + tracked.lear.pos + tracked.reye.pos 
+                                + tracked.leye.pos + tracked.chest.pos
+                                + tracked.lhip.pos + tracked.rhip.pos);
+
+
+            //glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glLoadIdentity();
+
+            //DRAW STUFF HERE
+            renderMesh(left_leg_mesh, 0, 0, 0, 0, tracked.lankle.pos.z);
+            renderMesh(right_leg_mesh, 0, 0, 0, 0, tracked.rankle.pos.z);
+            renderMesh(left_arm_mesh, 0, 0, 0, 0, tracked.lwrist.pos.z);
+            renderMesh(right_arm_mesh, 0, 0, 0, 0, tracked.lwrist.pos.z);
+            renderMesh(body_head_mesh, 0, 0, 0, 0, head_body_average.z);
+            glutSwapBuffers();
+
         }
 
     }
+
+    //glDeleteFramebuffers(1, &fbo);
+    //glDeleteRenderbuffers(1, &render_buf);
+
     // Return successful message
     return 0;
 }
 
 int main(int argc, char *argv[])
 {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
+    glutInitWindowPosition(100, 100);
+    glutInitWindowSize(screen_width, screen_height);
+    glutCreateWindow("WaifYou");
     // Parsing command line flags
     gflags::ParseCommandLineFlags(&argc, &argv, true);
+    gluPerspective(60, 1.0, 0.01f, 1000.0f);
 
     //TODO: read in from argv the video file name
 
