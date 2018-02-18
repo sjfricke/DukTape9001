@@ -2,34 +2,20 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <unistd.h>
 #include <sys/select.h>
 
 #include <sphinxbase/err.h>
 #include <sphinxbase/ad.h>
+#include <sphinxbase/prim_type.h>
 
 #include "pocketsphinx.h"
+#include "gpio.h"
 
-#define BUFF_SIZE 4096
+#define BUFF_SIZE 1024
 
 static ps_decoder_t *ps;
 static cmd_ln_t *config;
-
-/* Sleep for specified msec */
-static void
-sleep_msec(int32 ms)
-{
-#if (defined(_WIN32) && !defined(GNUWINCE)) || defined(_WIN32_WCE)
-    Sleep(ms);
-#else
-    /* ------------------- Unix ------------------ */
-    struct timeval tmo;
-
-    tmo.tv_sec = 0;
-    tmo.tv_usec = ms * 1000;
-
-    select(0, NULL, NULL, NULL, &tmo);
-#endif
-}
 
 //Processing information using the phrase
 char sentence[1024];
@@ -43,6 +29,11 @@ int l;
 char minichar[6];
 char anotherMini[11];
 int outCount = 0;
+
+#define G1 28
+#define G2 33
+#define Y1 36
+#define Y2 12
 
 static void austin_stuff(const char* phrase) {
   memset(songList, 0, 1024);
@@ -101,23 +92,8 @@ static void austin_stuff(const char* phrase) {
 
     puts("done with system");
     outCount++;
-    /*
-    printf("\n\n");
-    printf(commandString);
-    printf("\n");
-    printf(phrase);
-    printf("\n\n"); 
-    */
 }
 
-/*
- * Main utterance processing loop:
- *     for (;;) {
- *        start utterance and wait for speech to process
- *        decoding till end-of-utterance silence will be detected
-< *        print utterance result;
- *     }
- */
 static void
 recognize_from_microphone()
 {
@@ -127,40 +103,66 @@ recognize_from_microphone()
     int32 k;
     char const *hyp;
 
-    if ((ad = ad_open_dev("plughw:0,2",16000)) == NULL)
-        E_FATAL("Failed to open audio device\n");
-    if (ad_start_rec(ad) < 0)
-        E_FATAL("Failed to start recording\n");
+    if ((ad = ad_open_dev("plughw:0,2",16000)) == NULL) { puts("ERROR: Failed to open audio device"); }
+    if (ad_start_rec(ad) < 0) {  puts("ERROR: Failed to start recording"); }
+    if (ps_start_utt(ps) < 0) { puts("ERROR: Failed to start utterance"); }
 
-    if (ps_start_utt(ps) < 0)
-        E_FATAL("Failed to start utterance\n");
-    utt_started = FALSE;
-    E_INFO("Ready....\n");
+    GpioSetValue(G1, 1);
+    GpioSetValue(G2, 1);
+    GpioSetValue(Y1, 0);
+    GpioSetValue(Y2, 0);
+
+    utt_started = 0;
+    puts("Ready....");
 
     for (;;) {
         if ((k = ad_read(ad, adbuf, BUFF_SIZE)) < 0)
-            E_FATAL("Failed to read audio\n");
+            puts("ERROR: Failed to read audio");
+	
         ps_process_raw(ps, adbuf, k, FALSE, FALSE);
         in_speech = ps_get_in_speech(ps);
-        if (in_speech && !utt_started) {
-            utt_started = TRUE;
+
+	if (in_speech && !utt_started) {
+            utt_started = 1;
             puts("Listening...\n");
         }
-        if (!in_speech && utt_started) {
+
+	if (!in_speech && utt_started) {
             /* speech -> silence transition, time to start new utterance  */
             ps_end_utt(ps);
             hyp = ps_get_hyp(ps, NULL );
+
+	    GpioSetValue(G1, 0);
+	    GpioSetValue(G2, 0);
+	    GpioSetValue(Y1, 1);
+	    GpioSetValue(Y2, 1);
+
+	    // need to close since we use speaker for output
+	    ad_close(ad);
+	    if (ps_end_utt(ps) < 0){ puts("ERROR: Failed to stop utterance"); }
+	    if (ad_stop_rec(ad) < 0) { puts("ERROR: Failed to stop recording"); }
+    
             if (hyp != NULL) {
 	      puts("About to do Austin_stuff");
-                austin_stuff(hyp);
+	      austin_stuff(hyp);
             }
 
-            if (ps_start_utt(ps) < 0)
-                E_FATAL("Failed to start utterance\n");
-            utt_started = FALSE;
-            puts("Ready....\n");
+	    if ((ad = ad_open_dev("plughw:0,2",16000)) == NULL) { puts("ERROR: Failed to open audio device"); }
+	    if (ad_start_rec(ad) < 0) { puts("ERROR: Failed to start recording"); }
+	    if (ps_start_utt(ps) < 0){ puts("ERROR: Failed to Start utterance"); }
+    
+            utt_started = 0;
+	    memset(adbuf, 0, BUFF_SIZE);
+
+	    GpioSetValue(G1, 1);
+	    GpioSetValue(G2, 1);
+	    GpioSetValue(Y1, 0);
+	    GpioSetValue(Y2, 0);
+
+            puts("Ready Again....");
         }
-        sleep_msec(100);
+	//	usleep(1000000); // 10 ms
+	//	puts("sleep over");
     }
     ad_close(ad);
 }
@@ -169,6 +171,11 @@ int
 main(int argc, char *argv[])
 {
     err_set_logfile("log.txt");
+
+    GpioOutput(G1, 0);
+    GpioOutput(G2, 0);
+    GpioOutput(Y1, 1);
+    GpioOutput(Y2, 1);
     
     config = cmd_ln_init(NULL, ps_args(), TRUE,
                          "-hmm", "/usr/local/share/pocketsphinx/model/en-us/en-us",
