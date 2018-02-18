@@ -4,6 +4,7 @@ SPHINX = -I/usr/local/include -I/usr/local/include/sphinxbase -I/usr/local/inclu
 
 main:
 	        $(CC) $(CFLAGS) korra.c $(SPHINX) -o korra
+			C -o stringsplitter stringsplitter.c
 
 clean:
 	        rm korra
