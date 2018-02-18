@@ -47,6 +47,7 @@ class UserTracked2d {
 class UserMetrics {
 public:
     UserMetrics() { }
+    float nose_to_balls = 0.0f;
     float chest_to_nose = 0.0f; //"Chest" here actually means something more like "bottom of neck"
     float nose_to_ear = 0.0f;
     float chest_to_shoulder = 0.0f;
@@ -76,5 +77,7 @@ class UserTracked3d {
                     rankle, lhip, lknee, lankle, reye, leye,
                     rear, lear;
     UserTracked3d(UserMetrics metrics, UserTracked2d user);
+    std::vector<std::vector<float>> getAngles();
 };
+std::vector<float> calculateAngles(cv::Point3f newp, cv::Point3f newref);
 float distc(ConfidencePoint2f x, ConfidencePoint2f y);

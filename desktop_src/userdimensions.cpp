@@ -13,6 +13,7 @@ std::string UserMetrics::to_string() {
 }
 
 UserMetrics::UserMetrics(std::vector<UserTracked2d> trackedFrames) {
+    float nose_to_balls_weight = 0.0f;
     float nose_to_ear_weight = 0.0f;
     float chest_to_nose_weight = 0.0f;
     float chest_to_shoulder_weight = 0.0f;
@@ -22,6 +23,13 @@ UserMetrics::UserMetrics(std::vector<UserTracked2d> trackedFrames) {
     float knee_to_ankle_weight = 0.0f;
     for (int i = 0; i < trackedFrames.size(); i++) {
         UserTracked2d frame = trackedFrames[i];
+
+        cv::Point2f balls = 0.5f * frame.lhip.pos + frame.rhip.pos;
+        float ballsConfidence = frame.lhip.conf * frame.rhip.conf;
+        ConfidencePoint2f ballsPoint = ConfidencePoint2f(balls.x, balls.y, ballsConfidence);
+
+        nose_to_balls_weight += frame.nose.pairConf(ballsPoint);
+        this->nose_to_balls += frame.nose.confDist(ballsPoint);
 
         nose_to_ear_weight += frame.nose.pairConf(frame.lear) + frame.nose.pairConf(frame.rear);
         this->nose_to_ear += frame.nose.confDist(frame.lear) + frame.nose.confDist(frame.rear);
@@ -64,6 +72,16 @@ UserMetrics::UserMetrics(std::vector<UserTracked2d> trackedFrames) {
     this->shoulder_to_elbow /= shoulder_to_elbow_weight;
     this->hip_to_knee /= hip_to_knee_weight;
     this->knee_to_ankle /= knee_to_ankle_weight;
+    this->nose_to_balls /= nose_to_balls_weight;
+
+    this->nose_to_ear *= 1.1f;
+    this->chest_to_nose  *= 1.1f;
+    this->chest_to_shoulder *= 1.1f;
+    this->elbow_to_wrist *= 1.1f;
+    this->shoulder_to_elbow *= 1.1f;
+    this->hip_to_knee *= 1.1f;
+    this->knee_to_ankle *= 1.1f;
+    this->nose_to_balls *= 1.1f;
     //We did it :D
 }
 
@@ -94,7 +112,7 @@ float ConfidencePoint2f::confDist(ConfidencePoint2f other) {
 }
 
 ConfidencePoint3f::ConfidencePoint3f(float x, float y, float z, float conf) {
-    this->pos = cv::Point3f(x, y, conf);
+    this->pos = cv::Point3f(x, y, z);
     this->conf = conf;
 }
 
@@ -115,8 +133,8 @@ ConfidencePoint3f addZ(ConfidencePoint2f point, float z) {
 
 
 ConfidencePoint3f giveDepth(ConfidencePoint2f flatpoint, float metric, float metricNew, float offset) {
-    float z = sqrt(pow(metric, 2.0) + pow(metricNew, 2.0));
-    addZ(flatpoint, z + offset);
+    float z = sqrtf(metric * metric - metricNew * metricNew);
+    return addZ(flatpoint, z + offset);
 }
 
 UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
@@ -127,8 +145,16 @@ UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
     ConfidencePoint3f* threedeeparts[numParts] = {&nose, &chest, &rshoulder, &relbow, &rwrist,
                                                  &lshoulder, &lelbow, &lwrist, &lhip, &rknee, &lankle,
                                                  &lhip, &lknee, &lankle, &reye, &leye, &rear, &lear};
-    UserMetrics metrics = metrics;
-    
+
+    cv::Point2f balls = 0.5f * (user.lhip.pos + user.rhip.pos);
+    float nose_to_balls = dist(balls, user.nose.pos);
+    float scale_factor = metrics.nose_to_balls / nose_to_balls;
+
+    for (int i = 0; i < numParts; i++) {
+        ConfidencePoint2f point = twodeeparts[i];
+        //Don't worry 'bout it
+        //point.pos *= scale_factor;
+    }
 
     this->chest = giveDepth(user.chest, 0, 0, defaultDistance);
     this->nose = giveDepth(user.nose, metrics.chest_to_nose, distc(user.nose, user.chest), chest.getZ());
@@ -136,36 +162,36 @@ UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
     this->lear = addZ(user.rear, nose.getZ());
     this->rshoulder = giveDepth(user.rshoulder, metrics.chest_to_shoulder, distc(user.chest, user.rshoulder), chest.getZ());
     this->lshoulder = giveDepth(user.lshoulder, metrics.chest_to_shoulder, distc(user.chest, user.lshoulder), chest.getZ());
-    this->relbow = giveDepth(user.relbow, metrics.shoulder_to_elbow, distc(user.rshoulder, user.relbow), rshoulder.getZ());
-    this->lelbow = giveDepth(user.lelbow, metrics.shoulder_to_elbow, distc(user.lshoulder, user.lelbow), lshoulder.getZ());
-    this->rwrist = giveDepth(user.rwrist, metrics.elbow_to_wrist, distc(user.relbow, user.rwrist), relbow.getZ());
-    this->lwrist = giveDepth(user.lwrist, metrics.elbow_to_wrist, distc(user.lelbow, user.lwrist), lelbow.getZ());
+    //this->relbow = giveDepth(user.relbow, metrics.shoulder_to_elbow, distc(user.rshoulder, user.relbow), rshoulder.getZ());
+    //this->lelbow = giveDepth(user.lelbow, metrics.shoulder_to_elbow, distc(user.lshoulder, user.lelbow), lshoulder.getZ());
+    float shoulder_to_wrist = metrics.elbow_to_wrist + metrics.shoulder_to_elbow;
+    this->rwrist = giveDepth(user.rwrist, shoulder_to_wrist, distc(user.rshoulder, user.rwrist), rshoulder.getZ());
+    this->lwrist = giveDepth(user.lwrist, shoulder_to_wrist, distc(user.lshoulder, user.lwrist), lshoulder.getZ());
     this->rhip = giveDepth(user.rhip, 0, 0, defaultDistance);
     this->lhip = giveDepth(user.lhip, 0, 0, defaultDistance);
-    this->rknee = giveDepth(user.rknee, metrics.hip_to_knee, distc(user.rhip, user.rknee), rhip.getZ());
-    this->lknee = giveDepth(user.lknee, metrics.hip_to_knee, distc(user.lhip, user.lknee), lhip.getZ());
-    this->rankle = giveDepth(user.rankle, metrics.knee_to_ankle, distc(user.rknee, user.rankle), rknee.getZ());
-    this->lankle = giveDepth(user.lankle, metrics.knee_to_ankle, distc(user.lknee, user.lankle), lknee.getZ());
+    float hip_to_ankle = metrics.hip_to_knee + metrics.knee_to_ankle;
+    //this->rknee = giveDepth(user.rknee, hip_to_ankle, distc(user.rhip, user.rankle), rhip.getZ());
+    //this->lknee = giveDepth(user.lknee, hip_to_ankle, distc(user.lhip, user.lankle), lhip.getZ());
+    this->rankle = giveDepth(user.rankle, hip_to_ankle, distc(user.rhip, user.rankle), rhip.getZ());
+    this->lankle = giveDepth(user.lankle, hip_to_ankle, distc(user.lhip, user.lankle), lhip.getZ());
 }
 
-std::vector<float> calculateAngles(Point3f newp, Point3f newref, Point3f oldp, Point3f oldref) {
-        float oldx = oldref.x - oldp.x;
-        float oldy = oldref.y - oldp.y;
-        float oldz = oldref.z - oldp.z;
+std::vector<float> calculateAngles(cv::Point3f newp, cv::Point3f newref) {
         float newx = newref.x - newp.x;
         float newy = newref.y - newp.y;
+        float dist = sqrtf(newx * newx + newy * newy);
         float newz = newref.z - newp.z;
-    return {atan2(newx, newz) - atan2(oldx, oldz),
-            atan2(newy, newz) - atan2(oldy, oldz)}
+    return {(float) atan2(newy, newx),
+            (float) atan2(dist, newz)};
 }
 
-std::vector<std::vector<float>> UserTracked3d::getAngles(UserTracked3d next) {
+std::vector<std::vector<float>> UserTracked3d::getAngles() {
     return {
-        calculateAngles(next.threedeeparts.rwrist.pos, next.threedeeparts.rshoulder.pos, this->threedeeparts.rwrist.pos, this->threedeeparts.rshoulder.pos);
-        calculateAngles(next.threedeepalts.lwlist.pos, next.threedeepalts.lshoulder.pos, this->threedeepalts.lwrist.pos, this->threedeepalts.lshoulder.pos);
-        calculateAngles(next.threedeeparts.rankle.pos, next.threedeeparts.rhip.pos, this->threedeeparts.rankle.pos, this->threedeeparts.rhip.pos);
-        calculateAngles(next.threedeeparts.lankle.pos, next.threedeeparts.lhip.pos, this->threedeeparts.lankle.pos, this->threedeeparts.lhip.pos);
-    }
+        calculateAngles(this->rwrist.pos, this->rshoulder.pos), 
+        calculateAngles(this->lwrist.pos, this->lshoulder.pos), 
+        calculateAngles(this->rankle.pos, this->rhip.pos), 
+        calculateAngles(this->lankle.pos, this->lhip.pos)
+    };
 }
 
 UserTracked2d::UserTracked2d(std::vector<float> keypoints) {

@@ -123,14 +123,15 @@ void renderMesh(tinyobj::mesh_t& mesh, float screen_plane_rot, float into_screen
 
     op::log("\n", op::Priority::High);
     op::log(std::to_string(screen_plane_rot), op::Priority::High);
+    op::log(std::to_string(into_screen_rot), op::Priority::High);
     op::log("\n", op::Priority::High);
     
     glRotatef(into_screen_rot, 1.0f, 0.0f, 0.0f);
 
     glRotatef(screen_plane_rot, 0.0f, 0.0f, 1.0f);
 
-    glTranslatef(x * 0.001, y * 0.001, 1.0f);
-    glTranslatef(0, -0.1, 0.0f);
+    glTranslatef(x * 0.001, y * 0.001, (z - 80) * 0.1);
+    glTranslatef(0, 1, 0);
 
     glBegin(GL_TRIANGLES);
     for (int i = 0; i < mesh.positions.size(); i += 3) {
@@ -222,7 +223,7 @@ int waifYou(std::string videoSource)
         op::error("Could not load the video file " + videoSource, __LINE__, __FUNCTION__, __FILE__);
     }
 
-    int num_calibration_frames = 10;
+    int num_calibration_frames = 50;
 
     op::log("----------------------------------", op::Priority::High);
     op::log("------CALIBRATION START-----------", op::Priority::High);
@@ -231,7 +232,7 @@ int waifYou(std::string videoSource)
     op::log("------YOU WILL HAVE 5 SECONDS-----", op::Priority::High);
     op::log("------TO GET INTO T POSITION------", op::Priority::High);
     op::log("----------------------------------", op::Priority::High);
-    //getchar();
+    getchar();
     //sleep(5);
 
     
@@ -309,7 +310,7 @@ int waifYou(std::string videoSource)
 
             std::vector<std::vector<float>> angles = tracked.getAngles(); 
 
-            float z = 10.0;
+            float z = -0.5;
 
             //DRAW STUFF HERE
             /*
@@ -319,11 +320,11 @@ int waifYou(std::string videoSource)
             renderMesh(right_arm_mesh, angles[0][0], angles[0][1], tracked.rshoulder.pos.x, tracked.rshoulder.pos.y, tracked.lwrist.pos.z);
             renderMesh(body_head_mesh, 0, 0, 0, 0, head_body_average.z);
             */
-            renderMesh(left_leg_mesh, angles[3][0] - 3.14f, angles[3][1], tracked.lhip.pos.x - 600.0f, tracked.lhip.pos.y - 300.0f, z);
-            renderMesh(right_leg_mesh, angles[2][0] + 3.14f - 1.5f, angles[2][1], tracked.rhip.pos.x - 150.0f, tracked.rhip.pos.y + 275.0f, z);
-            renderMesh(left_arm_mesh, angles[1][0], angles[1][1], tracked.lshoulder.pos.x - 200.0f, tracked.lshoulder.pos.y, z);
-            renderMesh(right_arm_mesh, angles[0][0], angles[0][1], tracked.rshoulder.pos.x - 150.0f, tracked.rshoulder.pos.y, z);
-            renderMesh(body_head_mesh, 0, 0, head_body_average.x - 300.0, head_body_average.y - 500.0, z);
+            renderMesh(left_leg_mesh, angles[3][0], angles[3][1], tracked.lhip.pos.x, tracked.lhip.pos.y, z);
+            renderMesh(right_leg_mesh, angles[2][0], angles[2][1], tracked.rhip.pos.x, tracked.rhip.pos.y, z);
+            renderMesh(left_arm_mesh, angles[1][0], angles[1][1], tracked.lshoulder.pos.x, tracked.lshoulder.pos.y, z);
+            renderMesh(right_arm_mesh, angles[0][0], angles[0][1], tracked.rshoulder.pos.x, tracked.rshoulder.pos.y, z);
+            renderMesh(body_head_mesh, 0, 0, 0, 0, z);
             glutSwapBuffers();
 
         }
