@@ -11,7 +11,7 @@ std::string UserMetrics::to_string() {
     + ", Shoulder to Elbow " + std::to_string(shoulder_to_elbow) + ", Hip to Knee " + std::to_string(hip_to_knee)
     + ", Knee to Ankle " + std::to_string(knee_to_ankle);
 }
-    
+
 UserMetrics::UserMetrics(std::vector<UserTracked2d> trackedFrames) {
     float nose_to_ear_weight = 0.0f;
     float chest_to_nose_weight = 0.0f;
@@ -82,9 +82,11 @@ ConfidencePoint2f::ConfidencePoint2f(float x, float y, float conf) {
 float ConfidencePoint2f::pairConf(ConfidencePoint2f other) {
     return this->conf * other.conf;
 }
+
 float ConfidencePoint2f::confDist(ConfidencePoint2f other) {
     return this->pairConf(other) * dist(this->pos, other.pos);
 }
+
 ConfidencePoint3f::ConfidencePoint3f(float x, float y, float z, float conf) {
     this->pos = cv::Point3f(x, y, conf);
     this->conf = conf;
@@ -117,15 +119,12 @@ UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
                                  user.lhip, user.lknee, user.lankle, user.reye, user.leye, user.rear, user.lear};
 
     ConfidencePoint3f* threedeeparts[numParts] = {&nose, &chest, &rshoulder, &relbow, &rwrist,
-                                 &lshoulder, &lelbow, &lwrist, &lhip, &rknee, &lankle,
-                                 &lhip, &lknee, &lankle, &reye, &leye, &rear, &lear};
+                                                 &lshoulder, &lelbow, &lwrist, &lhip, &rknee, &lankle,
+                                                 &lhip, &lknee, &lankle, &reye, &leye, &rear, &lear};
+    UserMetrics metrics = metrics;
     
-    // for (int i = 0; i < this->numParts; i++) {
-    //     ConfidencePoint3f* dest_part = threedeeparts[i];
-    //     ConfidencePoint2f src_part = twodeeparts[i];
-    //     *dest_part = giveDepth(src_part, 0, 0, this->defaultDistance);
-    // }
 
+    
     this->chest3d = giveDepth(chest, 0, 0, defaultDistance);
     this->nose3d = giveDepth(nose, metric::chest_to_nose, nose::dist(chest), chest3d::z);
     this->rear3d = addZ(rear, nose::z);
@@ -144,8 +143,27 @@ UserTracked3d::UserTracked3d(UserMetrics metrics, UserTracked2d user) {
     this->lankle3d giveDepth(lankle, metric::knee_to_ankle, lankle::dist(lankle), lknee::z);
 }
 
-UserTracked2d::UserTracked2d(std::vector<float> keypoints) {
+std::vector<float> calculateAngles(Point3f newp, Point3f newref, Point3f oldp, Point3f oldref) {
+        float oldx = oldref.x - oldp.x;
+        float oldy = oldref.y - oldp.y;
+        float oldz = oldref.z - oldp.z;
+        float newx = newref.x - newp.x;
+        float newy = newref.y - newp.y;
+        float newz = newref.z - newp.z;
+    return {atan2(newx, newz) - atan2(oldx, oldz),
+            atan2(newy, newz) - atan2(oldy, oldz)}
+}
 
+std::vector<std::vector<float>> UserTracked3d::getAngles(UserTracked3d next) {
+    return {
+        calculateAngles(next.threedeeparts.rwrist.pos, next.threedeeparts.rshoulder.pos, this->threedeeparts.rwrist.pos, this->threedeeparts.rshoulder.pos);
+        calculateAngles(next.threedeepalts.lwlist.pos, next.threedeepalts.lshoulder.pos, this->threedeepalts.lwrist.pos, this->threedeepalts.lshoulder.pos);
+        calculateAngles(next.threedeeparts.rankle.pos, next.threedeeparts.rhip.pos, this->threedeeparts.rankle.pos, this->threedeeparts.rhip.pos);
+        calculateAngles(next.threedeeparts.lankle.pos, next.threedeeparts.lhip.pos, this->threedeeparts.lankle.pos, this->threedeeparts.lhip.pos);
+    }
+}
+
+UserTracked2d::UserTracked2d(std::vector<float> keypoints) {
     int numParts = 18;
     ConfidencePoint2f* parts[numParts] = {&nose, &chest, &rshoulder, &relbow, &rwrist,
                                  &lshoulder, &lelbow, &lwrist, &lhip, &rknee, &lankle,
